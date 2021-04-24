@@ -31,9 +31,9 @@ class AverageMeter:
 
     def get(self, *keys):
         if len(keys) == 1:
-            return self.__data[keys[0]][0] / self.__data[keys[0]][1]
+            return self.__data[keys[0]][0] / (self.__data[keys[0]][1] if self.__data[keys[0]][1] > 0 else 1e-6)
         else:
-            v_list = [self.__data[k][0] / self.__data[k][1] for k in keys]
+            v_list = [self.__data[k][0] / (self.__data[k][1] if self.__data[k][1] > 0 else 1e-6) for k in keys]
             return tuple(v_list)
 
     def pop(self, key=None):

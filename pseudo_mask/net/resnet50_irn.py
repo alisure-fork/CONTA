@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from net import resnet50
+import torch.nn.functional as F
+
 
 class Net(nn.Module):
 
@@ -94,6 +95,7 @@ class Net(nn.Module):
         self.backbone = nn.ModuleList([self.stage1, self.stage2, self.stage3, self.stage4, self.stage5])
         self.edge_layers = nn.ModuleList([self.fc_edge1, self.fc_edge2, self.fc_edge3, self.fc_edge4, self.fc_edge5, self.fc_edge6])
         self.dp_layers = nn.ModuleList([self.fc_dp1, self.fc_dp2, self.fc_dp3, self.fc_dp4, self.fc_dp5, self.fc_dp6, self.fc_dp7])
+        pass
 
     class MeanShift(nn.Module):
 
@@ -105,6 +107,8 @@ class Net(nn.Module):
             if self.training:
                 return input
             return input - self.running_mean.view(1, 2, 1, 1)
+
+        pass
 
     def forward(self, x):
         x1 = self.stage1(x).detach()
@@ -132,12 +136,14 @@ class Net(nn.Module):
         return edge_out, dp_out
 
     def trainable_parameters(self):
-        return (tuple(self.edge_layers.parameters()),
-                tuple(self.dp_layers.parameters()))
+        return tuple(self.edge_layers.parameters()), tuple(self.dp_layers.parameters())
 
     def train(self, mode=True):
         super().train(mode)
         self.backbone.eval()
+        pass
+
+    pass
 
 
 class AffinityDisplacementLoss(Net):
@@ -145,18 +151,17 @@ class AffinityDisplacementLoss(Net):
     path_indices_prefix = "path_indices"
 
     def __init__(self, path_index):
-
         super(AffinityDisplacementLoss, self).__init__()
 
         self.path_index = path_index
-
         self.n_path_lengths = len(path_index.path_indices)
         for i, pi in enumerate(path_index.path_indices):
             self.register_buffer(AffinityDisplacementLoss.path_indices_prefix + str(i), torch.from_numpy(pi))
+            pass
 
-        self.register_buffer(
-            'disp_target',
-            torch.unsqueeze(torch.unsqueeze(torch.from_numpy(path_index.search_dst).transpose(1, 0), 0), -1).float())
+        self.register_buffer('disp_target', torch.unsqueeze(torch.unsqueeze(
+            torch.from_numpy(path_index.search_dst).transpose(1, 0), 0), -1).float())
+        pass
 
     def to_affinity(self, edge):
         aff_list = []
@@ -211,6 +216,8 @@ class AffinityDisplacementLoss(Net):
 
         return pos_aff_loss, neg_aff_loss, dp_fg_loss, dp_bg_loss
 
+    pass
+
 
 class EdgeDisplacement(Net):
 
@@ -218,6 +225,7 @@ class EdgeDisplacement(Net):
         super(EdgeDisplacement, self).__init__()
         self.crop_size = crop_size
         self.stride = stride
+        pass
 
     def forward(self, x):
         feat_size = (x.size(2)-1)//self.stride+1, (x.size(3)-1)//self.stride+1
@@ -232,4 +240,5 @@ class EdgeDisplacement(Net):
 
         return edge_out, dp_out
 
+    pass
 

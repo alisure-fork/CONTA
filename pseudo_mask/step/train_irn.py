@@ -1,28 +1,26 @@
+import os
 import torch
-from torch.backends import cudnn
-cudnn.enabled = True
-from torch.utils.data import DataLoader
+from tqdm import tqdm
 import voc12.dataloader
+from torch.backends import cudnn
+from alisuretool.Tools import Tools
+from torch.utils.data import DataLoader
+from tools.read_info import read_image_info
 from misc import pyutils, torchutils, indexing
-import importlib
+from net.resnet50_irn import AffinityDisplacementLoss
+cudnn.enabled = True
+
 
 def run(args):
-
     path_index = indexing.PathIndex(radius=10, default_size=(args.irn_crop_size // 4, args.irn_crop_size // 4))
+    model = AffinityDisplacementLoss(path_index)
 
-    model = getattr(importlib.import_module(args.irn_network), 'AffinityDisplacementLoss')(
-        path_index)
+    image_info_list = read_image_info(args.voc12_root)
 
-    train_dataset = voc12.dataloader.VOC12AffinityDataset(args.train_list,
-                                                          label_dir=args.ir_label_out_dir,
-                                                          voc12_root=args.voc12_root,
-                                                          indices_from=path_index.src_indices,
-                                                          indices_to=path_index.dst_indices,
-                                                          hor_flip=True,
-                                                          crop_size=args.irn_crop_size,
-                                                          crop_method="random",
-                                                          rescale=(0.5, 1.5)
-                                                          )
+    train_dataset = voc12.dataloader.MyVOC12AffinityDataset(
+        image_info_list, label_dir=args.ir_label_out_dir,
+        indices_from=path_index.src_indices, indices_to=path_index.dst_indices,
+        hor_flip=True, crop_size=args.irn_crop_size, crop_method="random", rescale=(0.5, 1.5))
     train_data_loader = DataLoader(train_dataset, batch_size=args.irn_batch_size,
                                    shuffle=True, num_workers=args.num_workers, pin_memory=True, drop_last=True)
 
@@ -38,15 +36,11 @@ def run(args):
     model.train()
 
     avg_meter = pyutils.AverageMeter()
-
     timer = pyutils.Timer()
-
     for ep in range(args.irn_num_epoches):
-
-        print('Epoch %d/%d' % (ep+1, args.irn_num_epoches))
+        Tools.print('Epoch %d/%d' % (ep+1, args.irn_num_epoches))
 
         for iter, pack in enumerate(train_data_loader):
-
             img = pack['img'].cuda(non_blocking=True)
             bg_pos_label = pack['aff_bg_pos_label'].cuda(non_blocking=True)
             fg_pos_label = pack['aff_fg_pos_label'].cuda(non_blocking=True)
@@ -64,7 +58,6 @@ def run(args):
 
             avg_meter.add({'loss1': pos_aff_loss.item(), 'loss2': neg_aff_loss.item(),
                            'loss3': dp_fg_loss.item(), 'loss4': dp_bg_loss.item()})
-
             total_loss = (pos_aff_loss + neg_aff_loss) / 2 + (dp_fg_loss + dp_bg_loss) / 2
 
             optimizer.zero_grad()
@@ -73,38 +66,37 @@ def run(args):
 
             if (optimizer.global_step - 1) % 50 == 0:
                 timer.update_progress(optimizer.global_step / max_step)
-
-                print('step:%5d/%5d' % (optimizer.global_step - 1, max_step),
-                      'loss:%.4f %.4f %.4f %.4f' % (
-                      avg_meter.pop('loss1'), avg_meter.pop('loss2'), avg_meter.pop('loss3'), avg_meter.pop('loss4')),
+                Tools.print("{} {} {} {} {}".format('step:%5d/%5d' % (optimizer.global_step - 1, max_step),
+                      'loss:%.4f %.4f %.4f %.4f' % (avg_meter.pop('loss1'), avg_meter.pop('loss2'),
+                                                    avg_meter.pop('loss3'), avg_meter.pop('loss4')),
                       'imps:%.1f' % ((iter + 1) * args.irn_batch_size / timer.get_stage_elapsed()),
                       'lr: %.4f' % (optimizer.param_groups[0]['lr']),
-                      'etc:%s' % (timer.str_estimated_complete()), flush=True)
-        else:
-            timer.reset_stage()
+                      'etc:%s' % (timer.str_estimated_complete())))
+                pass
+            pass
+        timer.reset_stage()
+        pass
 
-    infer_dataset = voc12.dataloader.VOC12ImageDataset(args.infer_list,
-                                                       voc12_root=args.voc12_root,
-                                                       crop_size=args.irn_crop_size,
-                                                       crop_method="top_left")
-    infer_data_loader = DataLoader(infer_dataset, batch_size=args.irn_batch_size,
-                                   shuffle=False, num_workers=args.num_workers, pin_memory=True, drop_last=True)
+    image_info_list = read_image_info(args.voc12_root)
+    infer_dataset = voc12.dataloader.MyVOC12ImageDataset(
+        image_info_list, crop_size=args.irn_crop_size, crop_method="top_left")
+    infer_data_loader = DataLoader(infer_dataset, batch_size=args.irn_batch_size, shuffle=False,
+                                   num_workers=args.num_workers, pin_memory=True, drop_last=True)
 
     model.eval()
-    print('Analyzing displacements mean ... ', end='')
-
+    Tools.print('Analyzing displacements mean ... ')
     dp_mean_list = []
-
     with torch.no_grad():
         for iter, pack in enumerate(infer_data_loader):
             img = pack['img'].cuda(non_blocking=True)
-
             aff, dp = model(img, False)
-
             dp_mean_list.append(torch.mean(dp, dim=(0, 2, 3)).cpu())
-
+            pass
         model.module.mean_shift.running_mean = torch.mean(torch.stack(dp_mean_list), dim=0)
-    print('done.')
+        Tools.print('done.')
+        pass
 
     torch.save(model.module.state_dict(), args.irn_weights_name)
     torch.cuda.empty_cache()
+    pass
+

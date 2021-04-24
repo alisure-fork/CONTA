@@ -1,7 +1,9 @@
-import numpy as np
 import os
+import numpy as np
+from alisuretool.Tools import Tools
 from chainercv.datasets import VOCSemanticSegmentationDataset
 from chainercv.evaluations import calc_semantic_segmentation_confusion
+
 
 def run(args):
     dataset = VOCSemanticSegmentationDataset(split=args.chainer_eval_set, data_dir=args.voc12_root)
@@ -16,6 +18,7 @@ def run(args):
         cls_labels = np.argmax(cams, axis=0)
         cls_labels = keys[cls_labels]
         preds.append(cls_labels.copy())
+        pass
 
     confusion = calc_semantic_segmentation_confusion(preds, labels)
 
@@ -25,4 +28,5 @@ def run(args):
     denominator = gtj + resj - gtjresj
     iou = gtjresj / denominator
 
-    print({'iou': iou, 'miou': np.nanmean(iou)})
+    Tools.print({'iou': iou, 'miou': np.nanmean(iou)})
+    pass

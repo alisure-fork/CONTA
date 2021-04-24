@@ -1,3 +1,4 @@
+alisuretool
 numpy>=1.16.3
 cython
 imageio>=2.5.0

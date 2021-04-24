@@ -1,23 +1,23 @@
 import os
-import numpy as np
 import imageio
-
-from torch import multiprocessing
-from torch.utils.data import DataLoader
-
+import numpy as np
 import voc12.dataloader
+from torch import multiprocessing
+from alisuretool.Tools import Tools
 from misc import torchutils, imutils
+from torch.utils.data import DataLoader
+from tools.read_info import read_image_info
 
 
 def _work(process_id, infer_dataset, args):
-
     databin = infer_dataset[process_id]
     infer_data_loader = DataLoader(databin, shuffle=False, num_workers=0, pin_memory=False)
 
     for iter, pack in enumerate(infer_data_loader):
-        img_name = voc12.dataloader.decode_int_filename(pack['name'][0])
+        img_name = pack['name'][0]
         img = pack['img'][0].numpy()
-        cam_dict = np.load(os.path.join(args.cam_out_dir, img_name + '.npy'), allow_pickle=True).item()
+        now_name = img_name.split("Data/DET/")[1]
+        cam_dict = np.load(os.path.join(args.cam_out_dir, now_name).replace(".JPEG", ".npy"), allow_pickle=True).item()
 
         cams = cam_dict['high_res']
         keys = np.pad(cam_dict['keys'] + 1, (1, 0), mode='constant')
@@ -38,17 +38,22 @@ def _work(process_id, infer_dataset, args):
         conf[fg_conf == 0] = 255
         conf[bg_conf + fg_conf == 0] = 0
 
-        imageio.imwrite(os.path.join(args.ir_label_out_dir, img_name + '.png'),
-                        conf.astype(np.uint8))
-
+        imageio.imwrite(Tools.new_dir(os.path.join(
+            args.ir_label_out_dir, now_name).replace(".JPEG", ".png")), conf.astype(np.uint8))
 
         if process_id == args.num_workers - 1 and iter % (len(databin) // 20) == 0:
-            print("%d " % ((5 * iter + 1) // (len(databin) // 20)), end='')
+            Tools.print("%d " % ((5 * iter + 1) // (len(databin) // 20)))
+            pass
+    pass
+
 
 def run(args):
-    dataset = voc12.dataloader.VOC12ImageDataset(args.train_list, voc12_root=args.voc12_root, img_normal=None, to_torch=False)
+    image_info_list = read_image_info(args.voc12_root)
+
+    dataset = voc12.dataloader.MyVOC12ImageDataset(image_info_list, img_normal=None, to_torch=False)
     dataset = torchutils.split_dataset(dataset, args.num_workers)
 
-    print('[ ', end='')
+    Tools.print('Start cam to ir label')
     multiprocessing.spawn(_work, nprocs=args.num_workers, args=(dataset, args), join=True)
-    print(']')
+    Tools.print('End cam to ir label')
+    pass
