@@ -3,8 +3,8 @@ EXP:
     OUTPUT_DIR: data
 
 DATASET:
-    NAME: vocaug
-    ROOT: workspace/VOCdevkit
+    NAME: voc
+    ROOT: /media/ubuntu/4T/ALISURE/Data/SS/voc/VOCdevkit
     LABELS: ./data/datasets/voc12/labels.txt
     N_CLASSES: 21
     IGNORE_LABEL: 255
@@ -31,7 +31,7 @@ MODEL:
     NAME: DeepLabV2_ResNet101_MSC
     N_BLOCKS: [3, 4, 23, 3]
     ATROUS_RATES: [6, 12, 18, 24]
-    INIT_MODEL: imagenet_pre_trained_model
+    INIT_MODEL: imagenet_pre_trained_model/deeplabv1_resnet101-coco.pth
 
 SOLVER:
     BATCH_SIZE:
