@@ -210,7 +210,8 @@ def train(config_path, cuda):
 
 @main.command()
 @click.option("-c", "--config-path", type=click.File(), default="configs/voc12.yaml", help="configuration")
-@click.option("-m", "--model-path", type=click.Path(exists=True), required=True, help="PyTorch model to be loaded")
+@click.option("-m", "--model-path", type=click.Path(exists=True),
+              default="data/models/voc12/deeplabv2_resnet101_msc/train_aug/checkpoint_final.pth")
 @click.option("--cuda/--cpu", default=True, help="Enable CUDA if available [default: --cuda]")
 def test(config_path, model_path, cuda):
     # Configuration
