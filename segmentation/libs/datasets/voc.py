@@ -19,17 +19,18 @@ class VOC(_BaseDataset):
     PASCAL VOC Segmentation dataset
     """
 
-    def __init__(self, year=2012, **kwargs):
+    def __init__(self, year=2012, label_path=None, **kwargs):
         self.year = year
+        self.label_path = label_path
         super(VOC, self).__init__(**kwargs)
         pass
 
     def _set_files(self):
         self.root = osp.join(self.root, "VOC{}".format(self.year))
         self.image_dir = osp.join(self.root, "JPEGImages")
-        self.label_dir = osp.join(self.root, "SegmentationClass")
+        self.label_dir = osp.join(self.root, "SegmentationClass") if self.label_path is None else self.label_path
         if self.split == "train_aug":
-            self.label_dir = osp.join(self.root, "SegmentationClassAug")
+            self.label_dir = osp.join(self.root, "SegmentationClassAug") if self.label_path is None else self.label_path
             pass
         if self.split in ["train", "train_aug", "trainval", "val", "test"]:
             file_list = osp.join(self.root, "ImageSets/Segmentation", self.split + ".txt")

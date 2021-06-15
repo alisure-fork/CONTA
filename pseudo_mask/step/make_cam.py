@@ -10,8 +10,8 @@ from alisuretool.Tools import Tools
 from misc import torchutils, imutils
 from torch import multiprocessing, cuda
 from torch.utils.data import DataLoader
-from tools.read_info import read_image_info
 from net.resnet50_cam import CAM as resnet50_cam_net
+from tools.read_info import read_image_info, read_image_info_val, read_image_info_test
 cudnn.enabled = True
 warnings.filterwarnings("ignore")
 
@@ -28,8 +28,13 @@ def _work(process_id, model, dataset, args):
             valid_label = torch.where(pack['label'][0])[0]
             size = pack['size']
 
-            result_filename = Tools.new_dir(os.path.join(
-                args.cam_out_dir, img_name.split("Data/DET/")[1])).replace(".JPEG", ".npy")
+            if args.is_train:
+                result_filename = Tools.new_dir(os.path.join(
+                    args.cam_out_dir, img_name.split("Data/DET/")[1])).replace(".JPEG", ".npy")
+            else:
+                result_filename = Tools.new_dir(os.path.join(
+                    args.cam_out_dir, img_name.split("LID_track1/")[1])).replace(".JPEG", ".npy")
+                pass
 
             ##########################################################################################################
             if os.path.exists(result_filename):
@@ -85,7 +90,14 @@ def run(args):
     model.load_state_dict(torch.load(args.cam_weights_name + '.pth'), strict=True)
     model.eval()
 
-    image_info_list = read_image_info(args.voc12_root)
+    if args.is_train:
+        image_info_list = read_image_info(args.voc12_root)
+    else:
+        if args.is_test:
+            image_info_list = read_image_info_test(args.voc12_root)
+        else:
+            image_info_list = read_image_info_val(args.voc12_root)
+        pass
 
     dataset = voc12.dataloader.MyVOC12ClassificationDatasetMSF(
         image_info_list, num_classes=num_classes, scales=args.cam_scales)

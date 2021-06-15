@@ -8,3 +8,15 @@ def read_image_info(image_info_root):
     image_info_list = Tools.read_from_pkl(image_info_path)
     return image_info_list
 
+
+def read_image_info_test(image_info_root):
+    image_info_path = os.path.join(image_info_root, "deal", "image_info_list_test_for_conta.pkl")
+    image_info_list = Tools.read_from_pkl(image_info_path)
+    return image_info_list
+
+
+def read_image_info_val(image_info_root):
+    image_info_path = os.path.join(image_info_root, "deal", "image_info_list_val_for_conta.pkl")
+    image_info_list = Tools.read_from_pkl(image_info_path)
+    return image_info_list
+

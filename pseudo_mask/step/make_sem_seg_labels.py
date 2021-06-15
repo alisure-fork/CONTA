@@ -1,6 +1,5 @@
 import os
 import torch
-import imageio
 import numpy as np
 from PIL import Image
 import voc12.dataloader
@@ -10,8 +9,8 @@ from alisuretool.Tools import Tools
 from misc import torchutils, indexing
 from torch import multiprocessing, cuda
 from torch.utils.data import DataLoader
-from tools.read_info import read_image_info
 from net.resnet50_irn import EdgeDisplacement
+from tools.read_info import read_image_info, read_image_info_val, read_image_info_test
 cudnn.enabled = True
 
 
@@ -72,11 +71,19 @@ def _work(process_id, model, dataset, args):
     databin = dataset[process_id]
     data_loader = DataLoader(databin, shuffle=False, num_workers=args.num_workers // n_gpus, pin_memory=False)
 
-    with torch.no_grad(), cuda.device(process_id):
+    with torch.no_grad(), cuda.device(process_id % n_gpus):
         model.cuda()
         for iter, pack in enumerate(data_loader):
             img_name = pack['name'][0]
-            now_name = img_name.split("Data/DET/")[1]
+            if args.is_train:
+                now_name = img_name.split("Data/DET/")[1]
+            else:
+                now_name = img_name.split("LID_track1/")[1]
+                pass
+
+            result_filename = os.path.join(args.sem_seg_out_dir, now_name).replace(".JPEG", ".png")
+            if os.path.exists(result_filename):
+                continue
 
             orig_img_size = np.asarray(pack['size'])
             edge, dp = model(pack['img'][0].cuda(non_blocking=True))
@@ -96,8 +103,7 @@ def _work(process_id, model, dataset, args):
             rw_pred = torch.argmax(rw_up_bg, dim=0).cpu().numpy()
             rw_pred = keys[rw_pred]
 
-            UtilMy.gray_to_color(rw_pred.astype(np.uint8)).save(
-                Tools.new_dir(os.path.join(args.sem_seg_out_dir, now_name).replace(".JPEG", ".png")))
+            UtilMy.gray_to_color(rw_pred.astype(np.uint8)).save(Tools.new_dir(result_filename))
 
             if process_id == n_gpus - 1 and iter % (len(databin) // 20) == 0:
                 Tools.print("%d " % ((5*iter+1)//(len(databin) // 20)))
@@ -108,13 +114,20 @@ def _work(process_id, model, dataset, args):
 
 
 def run(args):
-    n_gpus = torch.cuda.device_count()
+    n_gpus = torch.cuda.device_count() * 1
 
     model = EdgeDisplacement()
     model.load_state_dict(torch.load(args.irn_weights_name), strict=False)
     model.eval()
 
-    image_info_list = read_image_info(args.voc12_root)
+    if args.is_train:
+        image_info_list = read_image_info(args.voc12_root)
+    else:
+        if args.is_test:
+            image_info_list = read_image_info_test(args.voc12_root)
+        else:
+            image_info_list = read_image_info_val(args.voc12_root)
+        pass
 
     dataset = voc12.dataloader.MyVOC12ClassificationDatasetMSF(image_info_list, scales=(1.0,))
     dataset = torchutils.split_dataset(dataset, n_gpus)

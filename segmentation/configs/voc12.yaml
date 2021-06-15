@@ -1,6 +1,6 @@
 EXP:
     ID: voc12
-    OUTPUT_DIR: data
+    OUTPUT_DIR: output/wss
 
 DATASET:
     NAME: voc

@@ -86,17 +86,20 @@ def train(config_path, cuda):
     device = get_device(cuda)
     torch.backends.cudnn.benchmark = True
 
+    # label_path = None
+    label_path = "/media/ubuntu/4T/ALISURE/USS/ConTa/pseudo_mask_voc/result/2/sem_seg/train_aug"
+
     # Dataset
     dataset = get_dataset(CONFIG.DATASET.NAME)(
-        root=CONFIG.DATASET.ROOT, split=CONFIG.DATASET.SPLIT.TRAIN, ignore_label=CONFIG.DATASET.IGNORE_LABEL,
+        root=CONFIG.DATASET.ROOT, label_path=label_path,
+        split=CONFIG.DATASET.SPLIT.TRAIN, ignore_label=CONFIG.DATASET.IGNORE_LABEL,
         mean_bgr=(CONFIG.IMAGE.MEAN.B, CONFIG.IMAGE.MEAN.G, CONFIG.IMAGE.MEAN.R), augment=True,
         base_size=CONFIG.IMAGE.SIZE.BASE, crop_size=CONFIG.IMAGE.SIZE.TRAIN, scales=CONFIG.DATASET.SCALES, flip=True)
     print(dataset)
 
     # DataLoader
-    loader = torch.utils.data.DataLoader(
-        dataset=dataset, batch_size=CONFIG.SOLVER.BATCH_SIZE.TRAIN,
-        num_workers=CONFIG.DATALOADER.NUM_WORKERS, shuffle=True)
+    loader = torch.utils.data.DataLoader(dataset=dataset, batch_size=CONFIG.SOLVER.BATCH_SIZE.TRAIN,
+                                         num_workers=CONFIG.DATALOADER.NUM_WORKERS, shuffle=True)
     loader_iter = iter(loader)
 
     # Model check
@@ -205,6 +208,7 @@ def train(config_path, cuda):
             torch.save(model.module.state_dict(), os.path.join(checkpoint_dir, "checkpoint_{}.pth".format(iteration)))
 
     torch.save(model.module.state_dict(), os.path.join(checkpoint_dir, "checkpoint_final.pth"))
+
     pass
 
 

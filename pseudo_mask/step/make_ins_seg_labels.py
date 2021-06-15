@@ -8,9 +8,9 @@ from torch.backends import cudnn
 from alisuretool.Tools import Tools
 from torch import multiprocessing, cuda
 from torch.utils.data import DataLoader
-from tools.read_info import read_image_info
 from net.resnet50_irn import EdgeDisplacement
 from misc import torchutils, imutils, pyutils, indexing
+from tools.read_info import read_image_info, read_image_info_val, read_image_info_test
 cudnn.enabled = True
 
 
@@ -113,7 +113,15 @@ def _work(process_id, model, dataset, args):
         model.cuda()
         for iter, pack in enumerate(data_loader):
             img_name = pack['name'][0]
-            now_name = img_name.split("Data/DET/")[1]
+            if args.is_train:
+                now_name = img_name.split("Data/DET/")[1]
+            else:
+                now_name = img_name.split("LID_track1/")[1]
+                pass
+
+            result_filename = os.path.join(args.ins_seg_out_dir, now_name).replace(".JPEG", ".npy")
+            if os.path.exists(result_filename):
+                continue
 
             size = np.asarray(pack['size'])
 
@@ -145,7 +153,7 @@ def _work(process_id, model, dataset, args):
             detected = detect_instance(rw_up.cpu().numpy(), instance_shape,
                                        instance_class_id, max_fragment_size=size[0] * size[1] * 0.01)
 
-            np.save(Tools.new_dir(os.path.join(args.ins_seg_out_dir, now_name).replace(".JPEG", ".npy")), detected)
+            np.save(Tools.new_dir(result_filename), detected)
 
             if process_id == n_gpus - 1 and iter % (len(databin) // 20) == 0:
                 Tools.print("%d " % ((5*iter+1)//(len(databin) // 20)))
@@ -163,7 +171,14 @@ def run(args):
     model.load_state_dict(torch.load(args.irn_weights_name), strict=False)
     model.eval()
 
-    image_info_list = read_image_info(args.voc12_root)
+    if args.is_train:
+        image_info_list = read_image_info(args.voc12_root)
+    else:
+        if args.is_test:
+            image_info_list = read_image_info_test(args.voc12_root)
+        else:
+            image_info_list = read_image_info_val(args.voc12_root)
+        pass
 
     dataset = voc12.dataloader.MyVOC12ClassificationDatasetMSF(image_info_list, scales=(1.0,))
     dataset = torchutils.split_dataset(dataset, n_gpus)

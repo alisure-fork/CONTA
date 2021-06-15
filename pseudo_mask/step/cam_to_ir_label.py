@@ -6,7 +6,7 @@ from torch import multiprocessing
 from alisuretool.Tools import Tools
 from misc import torchutils, imutils
 from torch.utils.data import DataLoader
-from tools.read_info import read_image_info
+from tools.read_info import read_image_info, read_image_info_val, read_image_info_test
 
 
 def _work(process_id, infer_dataset, args):
@@ -16,7 +16,16 @@ def _work(process_id, infer_dataset, args):
     for iter, pack in enumerate(infer_data_loader):
         img_name = pack['name'][0]
         img = pack['img'][0].numpy()
-        now_name = img_name.split("Data/DET/")[1]
+        if args.is_train:
+            now_name = img_name.split("Data/DET/")[1]
+        else:
+            now_name = img_name.split("LID_track1/")[1]
+            pass
+
+        result_filename = os.path.join(args.ir_label_out_dir, now_name).replace(".JPEG", ".png")
+        if os.path.exists(result_filename):
+            continue
+
         cam_dict = np.load(os.path.join(args.cam_out_dir, now_name).replace(".JPEG", ".npy"), allow_pickle=True).item()
 
         cams = cam_dict['high_res']
@@ -38,8 +47,7 @@ def _work(process_id, infer_dataset, args):
         conf[fg_conf == 0] = 255
         conf[bg_conf + fg_conf == 0] = 0
 
-        imageio.imwrite(Tools.new_dir(os.path.join(
-            args.ir_label_out_dir, now_name).replace(".JPEG", ".png")), conf.astype(np.uint8))
+        imageio.imwrite(Tools.new_dir(result_filename), conf.astype(np.uint8))
 
         if process_id == args.num_workers - 1 and iter % (len(databin) // 20) == 0:
             Tools.print("%d " % ((5 * iter + 1) // (len(databin) // 20)))
@@ -48,7 +56,14 @@ def _work(process_id, infer_dataset, args):
 
 
 def run(args):
-    image_info_list = read_image_info(args.voc12_root)
+    if args.is_train:
+        image_info_list = read_image_info(args.voc12_root)
+    else:
+        if args.is_test:
+            image_info_list = read_image_info_test(args.voc12_root)
+        else:
+            image_info_list = read_image_info_val(args.voc12_root)
+        pass
 
     dataset = voc12.dataloader.MyVOC12ImageDataset(image_info_list, img_normal=None, to_torch=False)
     dataset = torchutils.split_dataset(dataset, args.num_workers)
